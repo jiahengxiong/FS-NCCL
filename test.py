@@ -1,24 +1,46 @@
-import numpy as np
+# -*- coding: utf-8 -*-
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from baseline import baseline
+from Fast import fast
+from Slow import slow
+from FastSlow import fastslow
 
-def get_bandwidth_trace(method="gaussian", steps=1, capacity=100):
-    R_max = capacity  # Gbit/s
-    if method == "uniform":
-        A = np.random.uniform(0.1, 1.0, steps)
-    elif method == "gaussian":
-        # 更大方差 + clip 限制范围 0.1 - 1.0
-        A = np.clip(np.random.normal(0.5, 0.5, steps), 0.1, 1.0)
-    elif method == "onoff":
-        A = []
-        state = 1
-        for _ in range(steps):
-            if state == 1:
-                A.append(1.0)
-                state = 0 if np.random.rand() < 0.1 else 1
-            else:
-                A.append(0.1)
-                state = 1 if np.random.rand() < 0.3 else 0
-        A = np.array(A)
-    return R_max * A[0]  # Gbit/s at each step
+def run_one(algo_name, packet):
+    packet_size = packet / 1024.0
+    if algo_name == "baseline":
+        return baseline(packet_size)
+    elif algo_name == "fast":
+        return fast(packet_size)
+    elif algo_name == "slow":
+        return slow(packet_size)
+    elif algo_name == "fastslow":
+        return fastslow(packet_size)
 
-# 示例
-print(get_bandwidth_trace(method="gaussian", steps=1, capacity=100))
+if __name__ == "__main__":
+    packet_list = [8, 16, 32, 64]
+    algos = ["baseline", "fast", "slow", "fastslow"]
+
+    num_processes = 8  # <<< 在这里改进程数量即可
+
+    collective_time = [[None] * len(algos) for _ in packet_list]
+
+    with ProcessPoolExecutor(max_workers=num_processes) as pool:
+        futures = {}
+        for i, packet in enumerate(packet_list):
+            for j, algo in enumerate(algos):
+                fut = pool.submit(run_one, algo, packet)
+                futures[fut] = (i, j)
+
+        for fut in as_completed(futures):
+            i, j = futures[fut]
+            try:
+                result = fut.result()
+            except Exception as e:
+                result = f"ERROR: {e}"
+            collective_time[i][j] = result
+
+    for pkt, row in zip(packet_list, collective_time):
+        print(f"packet={pkt}KB -> {row}")
+
+    print("\nFinal collective_time:", collective_time)
