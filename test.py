@@ -21,24 +21,30 @@ if __name__ == "__main__":
     packet_list = [8, 16, 32, 64]
     algos = ["baseline", "fast", "slow", "fastslow"]
 
-    num_processes = 20  # <<< 在这里改进程数量即可
+    num_processes = 20  # <<< 改进程数量这里改
 
-    collective_time = [[None] * len(algos) for _ in packet_list]
+    results_dict = {}
 
     with ProcessPoolExecutor(max_workers=num_processes) as pool:
         futures = {}
         for i, packet in enumerate(packet_list):
             for j, algo in enumerate(algos):
                 fut = pool.submit(run_one, algo, packet)
-                futures[fut] = (i, j)
+                futures[fut] = (packet, algo, i, j)
 
         for fut in as_completed(futures):
-            i, j = futures[fut]
+            packet, algo, i, j = futures[fut]
             try:
                 result = fut.result()
             except Exception as e:
                 result = f"ERROR: {e}"
-            collective_time[i][j] = result
+            results_dict[(packet, algo)] = result
+
+    # 重新组装成二维列表，确保顺序完全一致
+    collective_time = [
+        [results_dict[(pkt, algo)] for algo in algos]
+        for pkt in packet_list
+    ]
 
     for pkt, row in zip(packet_list, collective_time):
         print(f"packet={pkt}KB -> {row}")
