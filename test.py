@@ -21,7 +21,7 @@ if __name__ == "__main__":
     packet_list = [8, 16, 32, 64]
     algos = ["baseline", "fast", "slow", "fastslow"]
 
-    num_processes = 8  # <<< 在这里改进程数量即可
+    num_processes = 20  # <<< 在这里改进程数量即可
 
     collective_time = [[None] * len(algos) for _ in packet_list]
 
