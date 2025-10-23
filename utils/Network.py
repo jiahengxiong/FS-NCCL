@@ -5,7 +5,9 @@ from utils.Traffic import get_bandwidth_trace
 
 class Network:
     def __init__(self):
-        self.topology = self.get_topology()
+        G = self.get_topology()
+        self.topology = G
+        self.relabel_non_gpu_nodes()
 
     def get_topology(self):
         G = nx.DiGraph()
@@ -154,6 +156,7 @@ class Network:
         # self.build_link_intraDC()
 
 
+
         return G
 
     def build_link_intraDC(self):
@@ -184,3 +187,19 @@ class Network:
                     self.topology.add_edge(DC_1_GPU_list[j], DC_1_GPU_list[i], key=uuid.uuid4().hex,
                                            capacity=get_bandwidth_trace(method='gaussian', steps=1, capacity=200),
                                            propagation_delay=7e-7)
+
+    def relabel_non_gpu_nodes(self):
+        """把非GPU节点改成从最大GPU编号+1开始的整数"""
+        G = self.topology
+        max_gpu_id = max(n for n in G.nodes if isinstance(n, int))  # GPU节点编号
+        next_id = max_gpu_id + 1
+        mapping = {}
+
+        for node in list(G.nodes):
+            if not isinstance(node, int):  # 非GPU节点
+                mapping[node] = next_id
+                next_id += 1
+
+        nx.relabel_nodes(G, mapping, copy=False)
+        # print(f"[INFO] Relabeled {len(mapping)} non-GPU nodes, total nodes now = {len(G.nodes)}")
+        return mapping  # 可选：返回映射表，便于查
