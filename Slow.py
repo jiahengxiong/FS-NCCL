@@ -1,5 +1,6 @@
 import copy
 import itertools
+import pickle
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -656,9 +657,9 @@ def slow(packet_size):
 
     collective_time = 0
     for c in range(collective):
-        network = Network.Network()
-        network.build_link_intraDC()
-        G = network.topology
+        path = "TOPO/" + str(c) + ".pkl"
+        with open(path, "rb") as f:
+            G = pickle.load(f)
         for u, v, data in G.edges(data=True):
             capacity = data.get("capacity", None)
             if capacity is not None and capacity > 0:
