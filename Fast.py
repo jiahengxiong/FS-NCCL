@@ -601,9 +601,9 @@ def update_ring_edges_from_G(G, ring):
 
 def fast(packet_size):
     collective = 100000
-    network = Network.Network()
-    network.build_link_intraDC()
-    G = network.topology
+    path = "TOPO/" + str(0) + ".pkl"
+    with open(path, "rb") as f:
+        G = pickle.load(f)
     ring_set = []
     for u, v, data in G.edges(data=True):
         capacity = data.get("capacity", None)
@@ -622,7 +622,7 @@ def fast(packet_size):
 
     collective_time = 0
     for c in range(collective):
-        path = "TOPO/" + str(c) + ".pkl"
+        path = "TOPO/" + str(c+1) + ".pkl"
         with open(path, "rb") as f:
             G = pickle.load(f)
         for u, v, data in G.edges(data=True):
