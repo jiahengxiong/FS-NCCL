@@ -599,12 +599,15 @@ def update_ring_edges_from_G(G, ring):
 
     return ring
 
-def baseline(packet_size):
+def baseline(packet_size, pro=0.000001):
     collective = 100000
     path = "TOPO/" + str(0) + ".pkl"
     with open(path, "rb") as f:
         G = pickle.load(f)
     ring_set = []
+    for u, v in G.edges():
+        G.del_edges[u, v]['propagation_delay'] = pro
+
     for u, v, data in G.edges(data=True):
         capacity = data.get("capacity", None)
         if capacity is not None and capacity > 0:
