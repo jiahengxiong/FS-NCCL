@@ -380,7 +380,7 @@ def reconfigure_WAN(G: nx.DiGraph, ring: nx.DiGraph, weight_attr="total_delay"):
 
     # --- 添加节点和边：GPU 相关边来自 G ---
     for (u, v, data) in G.edges(data=True):
-        if G.nodes[u].get("type") != "GPU" and G.nodes[v].get("type") != "GPU":
+        if G.nodes[u].get("type") != "GPU" or G.nodes[v].get("type") != "GPU":
             # 确保两端节点存在且复制属性
             if u not in AG:
                 AG.add_node(u, **G.nodes[u])
@@ -390,7 +390,7 @@ def reconfigure_WAN(G: nx.DiGraph, ring: nx.DiGraph, weight_attr="total_delay"):
 
     # --- 添加 WAN 内部边：来自 ring ---
     for (u, v, data) in ring.edges(data=True):
-        if G.nodes[u].get("type") == "GPU" or G.nodes[v].get("type") == "GPU":
+        if G.nodes[u].get("type") == "GPU" and G.nodes[v].get("type") == "GPU":
             if u not in AG:
                 AG.add_node(u, **G.nodes[u])
             if v not in AG:
