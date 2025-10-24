@@ -606,7 +606,7 @@ def baseline(packet_size, pro=0.000001):
         G = pickle.load(f)
     ring_set = []
     for u, v in G.edges():
-        G.del_edges[u, v]['propagation_delay'] = pro
+        G.edges[u, v]['propagation_delay'] = pro
 
     for u, v, data in G.edges(data=True):
         capacity = data.get("capacity", None)
