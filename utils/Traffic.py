@@ -18,6 +18,14 @@ def get_bandwidth_trace(method="uniform", steps=1, capacity=100):
                 A.append(0.1)
                 state = 1 if np.random.rand() < 0.3 else 0
         A = np.array(A)
+    elif method == "random":
+        # 离散随机取值：25, 50, 75, ..., 2*capacity
+        choices = np.arange(25, 2 * capacity + 1, 25)
+        A = np.random.choice(choices, size=steps)
+        return float(A[0])  # 单位 Gbit/s，直接返回绝对值
+    else:
+        raise ValueError(f"Unknown method: {method}")
+
     return R_max * A[0]  # Gbit/s at each step
 
 # 示例
