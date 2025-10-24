@@ -20,7 +20,7 @@ def run_one(algo_name, packet, pro):
 if __name__ == "__main__":
     packet_list = [8,16,32, 64]
     algos = ["baseline", "fast", "slow", "fastslow"]
-    pro = 0.01
+    pro = 0.00001
 
     num_processes = 20  # <<< 改进程数量这里改
 
