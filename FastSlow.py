@@ -527,7 +527,8 @@ def fastslow(packet_size, pro=0.000001):
     with open(path, "rb") as f:
         G = pickle.load(f)
     for u, v in G.edges():
-        G.edges[u, v]['propagation_delay'] = pro
+        if G.nodes[u]["type"] != "GPU" and G.nodes[v]["type"] != "GPU":
+            G.edges[u, v]['propagation_delay'] = pro
     ring_set = []
     for u, v, data in G.edges(data=True):
         capacity = data.get("capacity", None)
@@ -550,7 +551,8 @@ def fastslow(packet_size, pro=0.000001):
         with open(path, "rb") as f:
             G = pickle.load(f)
         for u, v in G.edges():
-            G.edges[u, v]['propagation_delay'] = pro
+            if G.nodes[u]["type"] != "GPU" and G.nodes[v]["type"] != "GPU":
+                G.edges[u, v]['propagation_delay'] = pro
         for u, v, data in G.edges(data=True):
             capacity = data.get("capacity", None)
             if capacity is not None and capacity > 0:
