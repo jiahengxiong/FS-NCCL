@@ -6,20 +6,21 @@ from Fast import fast
 from Slow import slow
 from FastSlow import fastslow
 
-def run_one(algo_name, packet):
+def run_one(algo_name, packet, pro):
     packet_size = packet / 1024.0
     if algo_name == "baseline":
-        return baseline(packet_size)
+        return baseline(packet_size, pro)
     elif algo_name == "fast":
-        return fast(packet_size)
+        return fast(packet_size, pro)
     elif algo_name == "slow":
-        return slow(packet_size)
+        return slow(packet_size, pro)
     elif algo_name == "fastslow":
-        return fastslow(packet_size)
+        return fastslow(packet_size, pro)
 
 if __name__ == "__main__":
     packet_list = [8, 16, 32, 64]
     algos = ["baseline", "fast", "slow", "fastslow"]
+    pro = 0.01
 
     num_processes = 20  # <<< 改进程数量这里改
 
@@ -29,7 +30,7 @@ if __name__ == "__main__":
         futures = {}
         for i, packet in enumerate(packet_list):
             for j, algo in enumerate(algos):
-                fut = pool.submit(run_one, algo, packet)
+                fut = pool.submit(run_one, algo, packet, pro)
                 futures[fut] = (packet, algo, i, j)
 
         for fut in as_completed(futures):
