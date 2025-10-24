@@ -572,7 +572,7 @@ def fastslow(packet_size, pro=0.000001):
         else:
             ring = update_ring_edges_from_G(G, ring)
             ring = reconfigure_WAN(G, ring, weight_attr="total_delay")
-        # ring = update_ring_edges_from_G(G, ring)
+        ring = update_ring_edges_from_G(G, ring)
 
         collective_time += simulate_allgather_event_driven(ring, verbose=False)
 
