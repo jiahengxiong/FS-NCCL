@@ -9,7 +9,7 @@ def add_sym_rand_link(G, u, v, cap_base=100, delay=1e-5, **extra_attrs):
       - 对这一对节点 {u,v} 采样一次 capacity，并在两个方向复用
       - 不同的节点对会重新采样（因为是不同的函数调用）
     """
-    cap = get_bandwidth_trace(method='random', steps=1, capacity=cap_base)
+    cap = get_bandwidth_trace(method='gaussian', steps=1, capacity=cap_base)
     attrs = dict(extra_attrs)
     attrs.update({
         "capacity": cap,
