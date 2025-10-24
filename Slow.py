@@ -664,7 +664,7 @@ def update_ring_edges_from_G(G, ring):
     return ring
 
 def slow(packet_size, pro=0.000001):
-    collective = 100
+    collective = 100000
     path = "TOPO/" + str(0) + ".pkl"
     with open(path, "rb") as f:
         G = pickle.load(f)
