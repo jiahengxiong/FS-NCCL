@@ -375,143 +375,31 @@ def build_ring(G, weight_attr="total_delay", wan_policy="edge-disjoint"):  # wan
 import networkx as nx
 import copy
 
-def reconfigure_WAN(G, ring, weight_attr="total_delay"):
-    """
-    仅重配 WAN：
-      - 保留 ring 中的两条 DC 内 GPU→GPU chain（删除其余边）
-      - 在 G 上求两条最短 WAN 路把两条 chain 串成 ring（禁止其它 GPU 作为中继）
-      - 将两条 WAN 路的所有边（含属性）加入到 AG
-    返回:
-      AG: 只优化了 WAN 部分后的有向 ring 子图
-    """
-    # --- 帮助函数 ---
-    def is_gpu(n):
-        return G.nodes[n].get("type") == "GPU"
+def reconfigure_WAN(G: nx.DiGraph, ring: nx.DiGraph, weight_attr="total_delay"):
+    AG = nx.DiGraph()
 
-    def w(u, v, data):
-        return data.get(weight_attr, None)
+    # --- 添加节点和边：GPU 相关边来自 G ---
+    for (u, v, data) in G.edges(data=True):
+        if G.nodes[u].get("type") != "GPU" and G.nodes[v].get("type") != "GPU":
+            # 确保两端节点存在且复制属性
+            if u not in AG:
+                AG.add_node(u, **G.nodes[u])
+            if v not in AG:
+                AG.add_node(v, **G.nodes[v])
+            AG.add_edge(u, v, **data)
 
-    # 1) 拷贝 + 去掉所有非 GPU→GPU 的边，只保留两条 DC 内的 GPU 链
-    AG = copy.copy(ring)
-    to_remove = []
-    for u, v in AG.edges():
-        # 只保留 GPU→GPU 的链段；其它边（包括旧 WAN）全部移除
-        if not (is_gpu(u) or is_gpu(v)):
-            to_remove.append((u, v))
-    AG.remove_edges_from(to_remove)
+    # --- 添加 WAN 内部边：来自 ring ---
+    for (u, v, data) in ring.edges(data=True):
+        if G.nodes[u].get("type") == "GPU" or G.nodes[v].get("type") == "GPU":
+            if u not in AG:
+                AG.add_node(u, **G.nodes[u])
+            if v not in AG:
+                AG.add_node(v, **G.nodes[v])
+            AG.add_edge(u, v, **data)
 
-    # 2) 在 GPU 子图中识别两条有向 chain（head: in=0,out=1；tail: in=1,out=0）
-    gpu_nodes = [n for n in AG.nodes() if is_gpu(n)]
-    H = AG.subgraph(gpu_nodes).copy()
-
-    # 找每个连通组件的 head / tail 并还原顺序
-    chains = []
-    # 将无向连通分量分开，再按出度/入度恢复有向链顺序
-    for comp in nx.weakly_connected_components(H):
-        sub = H.subgraph(comp).copy()
-        if sub.number_of_nodes() == 0:
-            continue
-        # head: in_degree==0 的唯一点；tail: out_degree==0 的唯一点
-        heads = [n for n in sub.nodes() if sub.in_degree(n) == 0 and sub.out_degree(n) == 1]
-        tails = [n for n in sub.nodes() if sub.out_degree(n) == 0 and sub.in_degree(n) == 1]
-        # 退化成一个点的链
-        if len(sub) == 1:
-            only = next(iter(sub.nodes()))
-            chains.append([only])
-            continue
-        if len(heads) != 1 or len(tails) != 1:
-            raise ValueError(f"GPU 子图不是两条干净的有向链（检测到异常头/尾）。heads={heads}, tails={tails}")
-        head, tail = heads[0], tails[0]
-        # 顺着 out-edge 走到尾
-        order = [head]
-        cur = head
-        while cur != tail:
-            succs = list(sub.successors(cur))
-            if len(succs) != 1:
-                raise ValueError("链上出现分叉，预期每个中间 GPU 的出度为 1。")
-            cur = succs[0]
-            order.append(cur)
-        chains.append(order)
-
-    if len(chains) != 2:
-        raise ValueError(f"期望恰好两条 GPU 链，但检测到 {len(chains)} 条。")
-
-    # 3) 在 G 上为两条链求 WAN 最短路：tail0->head1 与 tail1->head0（禁止其它 GPU 作为中继）
-    (chain0, chain1) = chains
-    head0, tail0 = chain0[0], chain0[-1]
-    head1, tail1 = chain1[0], chain1[-1]
-
-    gpu_set = set([n for n in G.nodes() if is_gpu(n)])
-
-    def node_ok(src, dst):
-        # 禁止任何其它 GPU 作为中继；端点放行
-        def ok(n):
-            if n in gpu_set and n not in (src, dst):
-                return False
-            return True
-        return ok
-
-    def shortest_no_mid_gpu(src, dst):
-        Hview = nx.subgraph_view(G, filter_node=node_ok(src, dst))
-        path = nx.shortest_path(Hview, source=src, target=dst, weight=w)
-        return path
-
-    try:
-        path01 = shortest_no_mid_gpu(tail0, head1)  # 链0尾 → 链1头
-    except nx.NetworkXNoPath:
-        raise ValueError(f"WAN 不可达：{tail0} → {head1}")
-    try:
-        path10 = shortest_no_mid_gpu(tail1, head0)  # 链1尾 → 链0头
-    except nx.NetworkXNoPath:
-        raise ValueError(f"WAN 不可达：{tail1} → {head0}")
-
-    # 4) 把两条 WAN 路的所有节点与边（含属性）加入到 AG
-    def add_path_edges(subgraph, path):
-        # 先确保所有节点在图里，属性继承自 G
-        for n in path:
-            if n not in subgraph:
-                subgraph.add_node(n, **G.nodes[n])
-        # 再逐边加入，继承原图所有边属性（注意你的图是多边图 key=uuid；这里合并为一条逻辑边）
-        for u, v in zip(path, path[1:]):
-            # 如果原图是 MultiDiGraph，这里可以聚合/选最小 cost 一条；当前是 DiGraph，直接取属性
-            data = G.get_edge_data(u, v, default={})
-            subgraph.add_edge(u, v, **data)
-
-    add_path_edges(AG, path01)
-    add_path_edges(AG, path10)
-
-    # —— 用“链 + WAN 路”确定性地构建有序环序列 ——
-    # 构建链的边序列（只在 GPU 子图上，链内必然存在这些边）
-    def chain_edges(chain_order):
-        return list(zip(chain_order, chain_order[1:]))
-
-    def path_edges(path):
-        return list(zip(path, path[1:]))
-
-    # 期望连接关系： chain0_tail == path01[0], path01[-1] == chain1_head,
-    #               chain1_tail == path10[0], path10[-1] == chain0_head
-    assert chain0[-1] == path01[0], "链0 尾与 WAN 路 0->1 的起点不一致"
-    assert path01[-1] == chain1[0], "WAN 路 0->1 的终点不是链1 头"
-    assert chain1[-1] == path10[0], "链1 尾与 WAN 路 1->0 的起点不一致"
-    assert path10[-1] == chain0[0], "WAN 路 1->0 的终点不是链0 头"
-
-    ordered_edges = []
-    ordered_edges += chain_edges(chain0)
-    ordered_edges += path_edges(path01)
-    ordered_edges += chain_edges(chain1)
-    ordered_edges += path_edges(path10)
-
-    ordered_nodes = [ordered_edges[0][0]] + [v for (_, v) in ordered_edges]
-
-    AG.graph["edge_sequence"] = ordered_edges
-    AG.graph["node_sequence"] = ordered_nodes
-
-    # 可选：把结果顺序存在 graph 属性里，方便你打印验证
-    AG.graph["chains"] = {"DC0_or_A": chain0, "DC1_or_B": chain1}
-    AG.graph["wan_paths"] = {"tail0->head1": path01, "tail1->head0": path10}
-    AG.graph["weight_attr"] = weight_attr
-
-    return AG
+    # --- 调用 build_ring 在 AG 上构建新的环 ---
+    new_ring = build_ring(AG, weight_attr=weight_attr)
+    return new_ring
 
 
 def max_gpu_segment_cost_along_ring(ring: nx.DiGraph, weight_attr="total_delay"):
