@@ -18,7 +18,7 @@ def run_one(algo_name, packet, pro):
         return fastslow(packet_size, pro)
 
 if __name__ == "__main__":
-    packet_list = [64]
+    packet_list = [8,16,3264]
     algos = ["baseline", "fast", "slow", "fastslow"]
     pro = 0.01
 
