@@ -88,19 +88,48 @@ from SIM.simulator import simulate_allgather_event_driven
 #             continue
 #     return ring_subgraph
 
+import matplotlib.pyplot as plt
+import networkx as nx
+import math
+
 def draw_ring_subgraph(ring_subgraph: nx.DiGraph, delay_attr="total_delay"):
-    pos = nx.spring_layout(ring_subgraph, seed=42)
-    plt.figure(figsize=(12, 8))
-    nx.draw_networkx_nodes(ring_subgraph, pos, node_size=800, node_color='lightblue')
-    nx.draw_networkx_labels(ring_subgraph, pos, font_size=10)
-    for u, v, data in ring_subgraph.edges(data=True):
-        label = f"{data.get(delay_attr, '?'):.1e}"
-        nx.draw_networkx_edges(ring_subgraph, pos, edgelist=[(u, v)], connectionstyle="arc3,rad=0.1", width=1.5)
-        nx.draw_networkx_edge_labels(ring_subgraph, pos, edge_labels={(u, v): label}, font_size=8)
-    plt.title(f"Ring Subgraph with Edge '{delay_attr}' Annotated")
+    # 尝试检测是否为环状节点
+    nodes = list(ring_subgraph.nodes())
+    n = len(nodes)
+    if n == 0:
+        return
+
+    # 使用圆形布局，避免重叠
+    pos = {node: (math.cos(2*math.pi*i/n), math.sin(2*math.pi*i/n)) for i, node in enumerate(nodes)}
+
+    plt.figure(figsize=(8, 8))
+    nx.draw_networkx_nodes(ring_subgraph, pos, node_size=800, node_color='lightblue', edgecolors='k', linewidths=0.8)
+    nx.draw_networkx_labels(ring_subgraph, pos, font_size=9, font_weight='bold')
+
+    # 为了避免边标签重叠，可以稍微弯曲边，并单独调整标签位置
+    curved_edges = []
+    for (u, v, data) in ring_subgraph.edges(data=True):
+        label = f"{data.get(delay_attr, '?'):.1e}" if isinstance(data.get(delay_attr, None), (int, float)) else "?"
+        curved_edges.append((u, v))
+        nx.draw_networkx_edges(
+            ring_subgraph,
+            pos,
+            edgelist=[(u, v)],
+            connectionstyle="arc3,rad=0.15",
+            width=1.2,
+            edge_color='gray',
+            arrowsize=12
+        )
+        # 在边中点处放置标签
+        mid_x = (pos[u][0] + pos[v][0]) / 2
+        mid_y = (pos[u][1] + pos[v][1]) / 2
+        plt.text(mid_x * 1.1, mid_y * 1.1, label, fontsize=7, color='darkred', ha='center', va='center')
+
+    plt.title(f"Ring Subgraph with '{delay_attr}' Values", fontsize=12)
     plt.axis('off')
     plt.tight_layout()
     plt.show()
+
 
 
 import networkx as nx
@@ -635,7 +664,7 @@ def update_ring_edges_from_G(G, ring):
     return ring
 
 def slow(packet_size, pro=0.000001):
-    collective = 100000
+    collective = 100
     path = "TOPO/" + str(0) + ".pkl"
     with open(path, "rb") as f:
         G = pickle.load(f)
@@ -678,8 +707,9 @@ def slow(packet_size, pro=0.000001):
 
         ring = update_ring_edges_from_G(G, ring)
         # ring = reconfigure_WAN(G, ring, weight_attr="total_delay")
-        if collective%10==0:
+        if c%10==0:
             ring = reconfigure_CCL(G, ring)
+            # draw_ring_subgraph(ring)
         ring = update_ring_edges_from_G(G, ring)
 
         collective_time += simulate_allgather_event_driven(ring, verbose=False)

@@ -565,7 +565,7 @@ def fastslow(packet_size, pro=0.000001):
 
         ring = update_ring_edges_from_G(G, ring)
         # ring = reconfigure_WAN(G, ring, weight_attr="total_delay")
-        if collective%10==0:
+        if c%10==0:
             ring = reconfigure_CCL(G, ring)
             ring = reconfigure_WAN(G, ring)
             ring = update_ring_edges_from_G(G, ring)
