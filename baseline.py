@@ -615,6 +615,7 @@ def baseline(packet_size, pro=0.000001):
             data["transmission_delay"] = delay
             data['total_delay'] = delay + data['propagation_delay']
         else:
+            print("ERROR!!!")
             data["transmission_delay"] = float("inf")
             data["total_delay"] = float("inf")
     ring = build_ring(G, wan_policy="edge-disjoint", weight_attr="total_delay")  # 可选: 'edge-disjoint' | 'node-disjoint' | 'allow-overlap'
