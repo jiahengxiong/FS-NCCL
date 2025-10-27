@@ -517,7 +517,7 @@ def update_ring_edges_from_G(G, ring):
     return ring
 
 def fast(packet_size,pro=0.000001):
-    collective = 100000
+    collective = 50
     path = "TOPO/" + str(0) + ".pkl"
     with open(path, "rb") as f:
         G = pickle.load(f)
@@ -535,6 +535,7 @@ def fast(packet_size,pro=0.000001):
             data["transmission_delay"] = float("inf")
             data["total_delay"] = float("inf")
     ring = build_ring(G, wan_policy="edge-disjoint", weight_attr="total_delay")  # 可选: 'edge-disjoint' | 'node-disjoint' | 'allow-overlap'
+    draw_ring_subgraph(ring)
     for edge in ring.edges():
         print(edge)
     simulate_allgather_event_driven(ring, verbose=True)
