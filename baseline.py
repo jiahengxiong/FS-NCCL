@@ -638,7 +638,7 @@ def baseline(packet_size, pro=0.000001):
     for u, v, data in G.edges(data=True):
         capacity = data.get("capacity", None)
         if capacity is not None and capacity > 0:
-            delay = packet_size / capacity
+            delay = packet_size / (capacity*1024*1024*1024)
             data["transmission_delay"] = delay
             data['total_delay'] = delay + data['propagation_delay']
         else:
@@ -649,8 +649,9 @@ def baseline(packet_size, pro=0.000001):
     ring = relabel_ring_gpus_simple(ring)
     write_simai_topo_half_pd_with_exline(ring)
     for edge in ring.edges():
-        print(edge)
+        print(edge, ring.edges[edge]["capacity"])
     simulate_allgather_event_driven(ring, verbose=True)
+    draw_ring_subgraph(ring)
 
 
     collective_time = 0
@@ -673,18 +674,18 @@ def baseline(packet_size, pro=0.000001):
         # ring = reconfigure_WAN(G, ring, weight_attr="total_delay")
 
         ring = update_ring_edges_from_G(G, ring)
-        draw_ring_subgraph(ring)
+        # draw_ring_subgraph(ring)
         collective_time += simulate_allgather_event_driven(ring, verbose=False)
         ring = relabel_ring_gpus_simple(ring)
         # draw_ring_subgraph(ring)
 
 
 
-    print("collective time:", collective_time)
+    # print("collective time:", collective_time)
     return collective_time
 
 
 
 if __name__ == '__main__':
-    packet_size = 64/ 1024  # bits
+    packet_size = 8 * 64 * 1024 * 1024  # bits
     baseline(packet_size)
